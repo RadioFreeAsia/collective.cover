@@ -4,18 +4,14 @@ inconsistencies among Archetypes and Dexterity.
 """
 from datetime import datetime
 from datetime import timedelta
-from tzlocal import get_localzone
 
 
 today = datetime.today()
 tomorrow = today + timedelta(days=1)
 
-TZNAME = get_localzone().zone
-
 
 def create_standard_content_for_tests(portal):
     """Create one instance of each standard content type, at least."""
-    from DateTime import DateTime
     from plone import api
 
     with api.env.adopt_roles(['Manager']):
@@ -45,12 +41,10 @@ def create_standard_content_for_tests(portal):
             container=portal,
             type='Event',
             title=u'My event',
-            startDate=DateTime(today),  # Archetypes
-            endDate=DateTime(tomorrow),
-            start=today,  # Dexterity
-            end=tomorrow,
-            timezone=TZNAME,
         )
+
+        # XXX: workaround https://github.com/plone/plone.api/issues/364
+        set_date_fields(obj, today, tomorrow)
 
         api.content.create(
             container=portal,
@@ -116,5 +110,22 @@ def set_text_field(obj, text):
         obj.setText(text)  # Archetypes
     except AttributeError:
         obj.text = RichTextValue(text, 'text/html', 'text/html')  # Dexterity
+    finally:
+        obj.reindexObject()
+
+
+def set_date_fields(obj, start, end):
+    """Set start and end fields in object on both, Archetypes and Dexterity."""
+    try:
+        # Archetypes
+        from DateTime import DateTime
+        obj.setStartDate(DateTime(start))
+        obj.setEndDate(DateTime(end))
+    except AttributeError:
+        # Dexterity
+        from tzlocal import get_localzone
+        obj.start = start
+        obj.end = end
+        obj.timezone = get_localzone().zone
     finally:
         obj.reindexObject()
